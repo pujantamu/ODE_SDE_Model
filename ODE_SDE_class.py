@@ -50,13 +50,13 @@ class LotkaVolterraModel:
         form of the drift. The lists are then fed to a plot method to generate the pretty plots
         '''
         
-        # Solve the Necrosis and Apoptosis Ct-DNA compartments using IID noise numerically
+        # Solve the Necrosis and Apoptosis Biomarker compartments using IID noise numerically
         dWt = np.random.normal(0, np.sqrt(self.dt), self.N) # Generates a matrix with brownian steps)
         necrosis_num = self.solve_compartment(self.necrosis_f,  self.nu, self.necrotic_start, dWt) # Uses the newly generated dWt to solve the sde numerically
         dWt = np.random.normal(0, np.sqrt(self.dt), self.N) # Generates a new independent matrix with brownian steps)
         apoptosis_num = self.solve_compartment(self.apoptosis_f,  self.nu, self.apoptotic_start, dWt) # Uses the newly generated dWt to solve the sde numerically
 
-        # Solve the Baseline and Evasive Ct-DNA compartments using IID noise numerically
+        # Solve the Baseline and Evasive Biomarker compartments using IID noise numerically
         dWt = np.random.normal(0, np.sqrt(self.dt), self.N)
         evasive_num = self.solve_compartment(self.Biomarker_Evasive, self.nu, self.evasive_start, dWt)
         dWt = np.random.normal(0, np.sqrt(self.dt), self.N)
@@ -72,7 +72,7 @@ class LotkaVolterraModel:
         necrosis_baseline_num = self.solve_compartment(self.Biomarker_baseline_necrosis, self.nu, self.necrotic_start*(1-self.initial_e_b), dWt)
         apoptosis_baseline_num = self.solve_compartment( self.Biomarker_baseline_apoptosis, self.nu, self.apoptotic_start*(1-self.initial_e_b), dWt)        
 
-        '''Path Solution for Baseline and Evasive Ct-DNA compartments. This one requires the full trajectory rather than just rates change. As such
+        '''Path Solution for Baseline and Evasive Biomarker compartments. This one requires the full trajectory rather than just rates change. As such
         I made a method called simulate_brownian motion for this. 
         '''
         # Monte Carlo Simulation of the path solution using different noise
@@ -81,7 +81,7 @@ class LotkaVolterraModel:
         self.W = self._simulate_brownian_motion()
         baseline_path =  self._simulate_paths( self.Biomarker_Baseline ,self.baseline_start)
 
-        # Path Solution for Baseline and Evasive Ct-DNA compartments using different noise
+        # Path Solution for Baseline and Evasive Biomarker compartments using different noise
         self.W = self._simulate_brownian_motion()
         necrosis_path =  self._simulate_paths( self.necrosis_f,self.necrotic_start )
         self.W = self._simulate_brownian_motion()
