@@ -42,9 +42,6 @@ class LotkaVolterraModel:
         self.apoptotic_start , self.necrotic_start = (C_0 * self.inital_proportion_a_n)/self.cstar, (C_0 * (1-self.inital_proportion_a_n))/self.cstar
         self.evasive_start , self.baseline_start = (C_0 * self.initial_e_b)/self.cstar, (C_0 * (1-self.initial_e_b))/self.cstar
         
-        #Fake Normalization for Ct-DNA abundance levels. Keep zero but idk if it does anything. It was a failed idea
-        self.fake = 0
-        
         # Solves the General Lotka-Volterra model and adds the results in the class variables
         self.solve(self.t)
         
@@ -61,29 +58,28 @@ class LotkaVolterraModel:
 
         # Solve the Baseline and Evasive Ct-DNA compartments using IID noise numerically
         dWt = np.random.normal(0, np.sqrt(self.dt), self.N)
-        evasive_num = self.solve_compartment(self.Ct_DNA_Evasive, self.nu, self.evasive_start, dWt)
+        evasive_num = self.solve_compartment(self.Biomarker_Evasive, self.nu, self.evasive_start, dWt)
         dWt = np.random.normal(0, np.sqrt(self.dt), self.N)
-        baseline_num = self.solve_compartment( self.Ct_DNA_Baseline, self.nu, self.baseline_start, dWt)
+        baseline_num = self.solve_compartment( self.Biomarker_Baseline, self.nu, self.baseline_start, dWt)
 
         # Solve the Evasive release mechs under same noise
         dWt = np.random.normal(0, np.sqrt(self.dt), self.N) # Generates a matrix with brownian steps)
-        necrosis_evasive_num = self.solve_compartment(self.Ct_DNA_evasive_necrosis, self.nu, self.necrotic_start * self.initial_e_b, dWt) # Uses the same dWt to solve the sde numerically
-        apoptosis_evasive_num = self.solve_compartment( self.Ct_DNA_evasive_apoptosis, self.nu, self.apoptotic_start * self.initial_e_b , dWt)        
+        necrosis_evasive_num = self.solve_compartment(self.Biomarker_evasive_necrosis, self.nu, self.necrotic_start * self.initial_e_b, dWt) # Uses the same dWt to solve the sde numerically
+        apoptosis_evasive_num = self.solve_compartment( self.Biomarker_evasive_apoptosis, self.nu, self.apoptotic_start * self.initial_e_b , dWt)        
 
         # Solve the Baseline release mechs under same noise
         dWt = np.random.normal(0, np.sqrt(self.dt), self.N)
-        necrosis_baseline_num = self.solve_compartment(self.Ct_DNA_baseline_necrosis, self.nu, self.necrotic_start*(1-self.initial_e_b), dWt)
-        apoptosis_baseline_num = self.solve_compartment( self.Ct_DNA_baseline_apoptosis, self.nu, self.apoptotic_start*(1-self.initial_e_b), dWt)        
+        necrosis_baseline_num = self.solve_compartment(self.Biomarker_baseline_necrosis, self.nu, self.necrotic_start*(1-self.initial_e_b), dWt)
+        apoptosis_baseline_num = self.solve_compartment( self.Biomarker_baseline_apoptosis, self.nu, self.apoptotic_start*(1-self.initial_e_b), dWt)        
 
         '''Path Solution for Baseline and Evasive Ct-DNA compartments. This one requires the full trajectory rather than just rates change. As such
-        I made a method called simulate_brownian motion for this. I was too lazy to make a new method that combines the dWt and self.W part.
-        Gotta deal with indexes. It worked for me so i never got around to it.
+        I made a method called simulate_brownian motion for this. 
         '''
         # Monte Carlo Simulation of the path solution using different noise
         self.W = self._simulate_brownian_motion() # Generates full trajectory and saves it as a class variable
-        evasive_path =  self._simulate_paths( self.Ct_DNA_Evasive, self.evasive_start ) # Generates path solution using the analytical formula vis Euler Maruyama
+        evasive_path =  self._simulate_paths( self.Biomarker_Evasive, self.evasive_start ) # Generates path solution using the analytical formula vis Euler Maruyama
         self.W = self._simulate_brownian_motion()
-        baseline_path =  self._simulate_paths( self.Ct_DNA_Baseline ,self.baseline_start)
+        baseline_path =  self._simulate_paths( self.Biomarker_Baseline ,self.baseline_start)
 
         # Path Solution for Baseline and Evasive Ct-DNA compartments using different noise
         self.W = self._simulate_brownian_motion()
@@ -93,19 +89,19 @@ class LotkaVolterraModel:
 
         # Path Solution for evasive compartments with same noise
         self.W = self._simulate_brownian_motion()
-        necrosis_evasive_path =  self._simulate_paths( self.Ct_DNA_evasive_necrosis,self.necrotic_start * self.initial_e_b )
-        apoptosis_evasive_path =  self._simulate_paths( self.Ct_DNA_evasive_apoptosis ,self.apoptotic_start * self.initial_e_b)
+        necrosis_evasive_path =  self._simulate_paths( self.Biomarker_evasive_necrosis,self.necrotic_start * self.initial_e_b )
+        apoptosis_evasive_path =  self._simulate_paths( self.Biomarker_evasive_apoptosis ,self.apoptotic_start * self.initial_e_b)
         
         # Path Solution for baseline compartments with same noise
         self.W = self._simulate_brownian_motion()
-        necrosis_baseline_path =  self._simulate_paths( self.Ct_DNA_baseline_necrosis,self.necrotic_start*(1-self.initial_e_b) )
-        apoptosis_baseline_path =  self._simulate_paths( self.Ct_DNA_baseline_apoptosis ,self.apoptotic_start*(1-self.initial_e_b))
+        necrosis_baseline_path =  self._simulate_paths( self.Biomarker_baseline_necrosis,self.necrotic_start*(1-self.initial_e_b) )
+        apoptosis_baseline_path =  self._simulate_paths( self.Biomarker_baseline_apoptosis ,self.apoptotic_start*(1-self.initial_e_b))
 
         # Mean and Variance of the solution for different drift f. Currently evasive and baseline
-        mean_path_evasive= np.array([self.Mean_SDE_compartment(t,self.Ct_DNA_Evasive,self.evasive_start) for t in self.t])
-        var_path_evasive = np.array([self.Var_SDE_compartment(t,self.Ct_DNA_Evasive, mean_path_evasive,self.evasive_start) for t in self.t])
-        mean_path_baseline= np.array([self.Mean_SDE_compartment(t,self.Ct_DNA_Baseline,self.baseline_start) for t in self.t])
-        var_path_baseline = np.array([self.Var_SDE_compartment(t,self.Ct_DNA_Baseline, mean_path_baseline,self.baseline_start) for t in self.t])
+        mean_path_evasive= np.array([self.Mean_SDE_compartment(t,self.Biomarker_Evasive,self.evasive_start) for t in self.t])
+        var_path_evasive = np.array([self.Var_SDE_compartment(t,self.Biomarker_Evasive, mean_path_evasive,self.evasive_start) for t in self.t])
+        mean_path_baseline= np.array([self.Mean_SDE_compartment(t,self.Biomarker_Baseline,self.baseline_start) for t in self.t])
+        var_path_baseline = np.array([self.Var_SDE_compartment(t,self.Biomarker_Baseline, mean_path_baseline,self.baseline_start) for t in self.t])
 
         # Plotting is based on order
         if plot:
@@ -120,17 +116,6 @@ class LotkaVolterraModel:
                             necrosis_evasive_path,apoptosis_evasive_path,
                             necrosis_baseline_path,apoptosis_baseline_path,
                             mean_path_baseline, var_path_baseline)
-            # Plot the results
-            # self.plot_combined( self.t, necrosis_num, apoptosis_num,
-            #                    evasive_num, baseline_num,
-            #                    evasive_path, baseline_path,
-            #                    necrosis_path,apoptosis_path,
-            #                    mean_path_evasive,var_path_evasive,
-            #                    necrosis_evasive_num, apoptosis_evasive_num,
-            #                    necrosis_baseline_num,apoptosis_baseline_num,
-            #                    necrosis_evasive_path,apoptosis_evasive_path,
-            #                    necrosis_baseline_path,apoptosis_baseline_path,
-            #                    mean_path_baseline, var_path_baseline)
         
     def model(self, y, t):
         ''' 
@@ -153,32 +138,32 @@ class LotkaVolterraModel:
     functions for different release mechanisms: In terms of the table, the first four represent the four entries and the last
     five represent the linear combination of interest for us
     '''
-    def Ct_DNA_evasive_apoptosis(self, t):
+    def Biomarker_evasive_apoptosis(self, t):
         return (self.alpha * self.T1[t] * self.I[t])/ self.cstar
         
-    def Ct_DNA_evasive_necrosis(self, t):
+    def Biomarker_evasive_necrosis(self, t):
         return (self.r * self.T1[t]  * ( (self.T1[t] + self.p * self.T2[t]) / self.K))/ self.cstar
     
-    def Ct_DNA_baseline_apoptosis(self, t):
+    def Biomarker_baseline_apoptosis(self, t):
         return  (self.beta * self.T2[t] * self.I[t] )/ self.cstar
     
-    def Ct_DNA_baseline_necrosis(self, t):
+    def Biomarker_baseline_necrosis(self, t):
         return (self.gamma * self.T2[t]* (  (self.q * self.T1[t] + self.T2[t]) / self.K))/ self.cstar
       
-    def Ct_DNA_Evasive(self, t):
-        return  self.Ct_DNA_evasive_apoptosis(t) + self.Ct_DNA_evasive_necrosis(t) 
+    def Biomarker_Evasive(self, t):
+        return  self.Biomarker_evasive_apoptosis(t) + self.Biomarker_evasive_necrosis(t) 
 
-    def Ct_DNA_Baseline(self, t):
-        return  self.Ct_DNA_baseline_apoptosis(t) + self.Ct_DNA_baseline_necrosis(t) 
+    def Biomarker_Baseline(self, t):
+        return  self.Biomarker_baseline_apoptosis(t) + self.Biomarker_baseline_necrosis(t) 
 
     def apoptosis_f(self, t):
-        return self.Ct_DNA_evasive_apoptosis(t) + self.Ct_DNA_baseline_apoptosis(t)
+        return self.Biomarker_evasive_apoptosis(t) + self.Biomarker_baseline_apoptosis(t)
 
     def necrosis_f(self, t):
-        return  self.Ct_DNA_evasive_necrosis(t) + self.Ct_DNA_baseline_necrosis(t) 
+        return  self.Biomarker_evasive_necrosis(t) + self.Biomarker_baseline_necrosis(t) 
 
     def all_compartments(self,t):
-        return self.Ct_DNA_evasive_apoptosis(t) + self.Ct_DNA_baseline_apoptosis(t) + self.Ct_DNA_evasive_necrosis(t) + self.Ct_DNA_baseline_necrosis(t) 
+        return self.Biomarker_evasive_apoptosis(t) + self.Biomarker_baseline_apoptosis(t) + self.Biomarker_evasive_necrosis(t) + self.Biomarker_baseline_necrosis(t) 
 
 
     def solve_compartment(self, compartment_f,nu, initial,dWt):
@@ -283,7 +268,7 @@ class LotkaVolterraModel:
                
         for ax in axs:
             ax.legend()
-        fig.suptitle('Mean and Variance Trajectory for Cd-dna Evasive')
+        fig.suptitle('Mean and Variance Trajectory for Biomarker Evasive')
         plt.show()
         # Standard deviation from the Variance Trajectory (L)
         std_dev_L = np.sqrt(np.maximum(var_path_evasive, 0))  # Avoiding negative values 
