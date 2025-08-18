@@ -15,7 +15,7 @@ plt.rcParams["text.latex.preamble"] += r"\usepackage{amssymb}"
 # Class for the Lotka-Volterra Model
 
 class LotkaVolterraModel:
-    # Just initialing does everything but ode_details. bad coding etiquette but worked for me. 
+    # Just initialing does everything but ode_details. 
     def __init__(self, r, gamma, alpha, beta, a, b, delta, p,q, K, nu, sigma, R_0, S_0, I_0, C_0 , inital_proportion_a_n, initial_e_b, T, steps ,cstar, plot):
         self.r = r
         self.gamma = gamma
@@ -556,13 +556,9 @@ class LotkaVolterraModel:
         plt.legend()
         plt.show
         
-        # Create a figure
         fig = plt.figure(figsize=(20, 24))
-
-        # Create the grid specification (4 rows, different column spans)
         gs = gridspec.GridSpec(4, 2, height_ratios=[1, 1, 1, 1], width_ratios=[1, 1])
 
-        # Row 1: 1 centered plot (taking the full width of the row)
         ax1 = plt.subplot(gs[0, :])
         ax1.plot(t, self.T1, label='Evasive Tumor ($E$)')
         ax1.plot(t, self.T2, label='Baseline Tumor ($B$)')
@@ -572,7 +568,6 @@ class LotkaVolterraModel:
         ax1.set_title('Lotka-Volterra Model with One Immune and Two Tumor Sub-Clones')
         ax1.legend()
 
-        # Row 2: 2 plots side by side
         ax2 = plt.subplot(gs[1, 0])
         ax2.plot(t, evasive_num + baseline_num, label='SDE Numerical', linestyle='--', color='pink')
         ax2.plot(t, evasive_path + baseline_path, label='Path Solution',  color='red')
@@ -591,7 +586,6 @@ class LotkaVolterraModel:
         ax3.set_title('Biomarker Diffusion (Path vs Numerical Solution)')
         ax3.legend()
 
-        # Row 3: 2 plots side by side
         ax4 = plt.subplot(gs[2, 0])
         ax4.plot(t, evasive_path, label='Evasive Clone (Path)', color='red')
         ax4.plot(t, baseline_path, label='Baseline Clone (Path)', color='blue')
@@ -618,7 +612,6 @@ class LotkaVolterraModel:
         ax5.set_title('Biomarker Diffusion via Mechanism Source (Path vs Numerical Solution)')
         ax5.legend()
 
-        # Row 4: 1 plot that takes the whole row
         ax6 = plt.subplot(gs[3, :])
         # Standard deviation from the Variance Trajectory (L)
         std_dev_evasive = np.sqrt(np.maximum(var_path_evasive, 0))  # Avoiding negative values 
@@ -643,12 +636,9 @@ class LotkaVolterraModel:
         ax6.plot(t, baseline_path, label='Baseline (Path)', color='dodgerblue')
         ax6.legend()   
         fig.suptitle(f'r = {self.r}, gamma = {self.gamma}, alpha = {self.alpha}, beta = {self.beta}, a = {self.a}, b = {self.b}, delta = {self.delta}, p = {self.p} , q = {self.q}, K = {self.K}, nu = {self.nu}, sigma= {self.sigma}, ($E_0$, $B_0$, $I_0$)= ({self.initial_conditions[0]}, {self.initial_conditions[1]}, {self.initial_conditions[2]}), $C_0$ = {self.apoptotic_start}, T = {self.T}, $C^*$ = {self.cstar}')
-        # Adjust layout
         plt.tight_layout(rect=[0, 0, 1, 0.97])
 
-        # Display the plot
         plt.show()
-        # Create a figure with two subplots side by side
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
 
         # First plot on the left (Lotka-Volterra Model)
@@ -675,10 +665,10 @@ class LotkaVolterraModel:
         ax2.set_ylabel('Biomarker Proportion')
         ax2.set_title('Necrosis and Apoptosis (Path and Num)')
 
-        # Adjust layout for better spacing
         plt.tight_layout()
         plt.show()
         
        
         
         
+
