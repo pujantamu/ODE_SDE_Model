@@ -282,9 +282,6 @@ class LotkaVolterraModel:
         plt.fill_between(t, lower_bound, upper_bound, color='skyblue', alpha=0.2, label='± 1 Std-dev')
         plt.plot(t, evasive_num, label='Evasive Clone (Numerical)', linestyle='--', color='pink')
         plt.plot(t, evasive_path, label='Evasive Clone (Path)', color='lightgreen')
-                        
-        
-        
         plt.show()
         
         
@@ -671,4 +668,5 @@ class LotkaVolterraModel:
        
         
         
+
 
