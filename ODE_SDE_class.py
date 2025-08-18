@@ -217,7 +217,7 @@ class LotkaVolterraModel:
         fig, axs = plt.subplots(2, 2, figsize=(30, 12))
         
         ''' 
-        Plots stuff :)
+        Plots stuff :) DEPRECATED
         '''
         axs[0, 0].plot(t, self.T1, label='Evasive Tumor (T1)')
         axs[0, 0].plot(t, self.T2, label='Baseline (T2)')
@@ -253,8 +253,6 @@ class LotkaVolterraModel:
         axs[1, 1].set_title('Biomarker Diffusion (Path vs Numerical Solution)')
         axs[1, 1].legend()
                 
-        
-
         plt.tight_layout(rect=[0, 0, 1, 0.95])
         fig.suptitle(f'r = {self.r}, gamma = {self.gamma}, alpha = {self.alpha}, beta = {self.beta}, a = {self.a}, b = {self.b}, delta = {self.delta}, K = {self.K}, nu = {self.nu}, sigma= {self.sigma}')
         plt.show()
@@ -540,7 +538,7 @@ class LotkaVolterraModel:
                            mean_path_baseline, var_path_baseline): 
         
         '''
-        Plots paper as well but note the same maybe haha. CURRENTLY DEPRECETED
+        Plots paper
         '''
         
         plt.figure(figsize=(10, 4))
@@ -668,5 +666,6 @@ class LotkaVolterraModel:
        
         
         
+
 
 
