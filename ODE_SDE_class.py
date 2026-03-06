@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.integrate import odeint,dblquad
 import matplotlib.gridspec as gridspec
+from math import sqrt
 import logging 
 from tabulate import tabulate
 
@@ -15,8 +16,8 @@ plt.rcParams["text.latex.preamble"] += r"\usepackage{amssymb}"
 # Class for the Lotka-Volterra Model
 
 class LotkaVolterraModel:
-    # Just initialing does everything but ode_details. 
-    def __init__(self, r, gamma, alpha, beta, a, b, delta, p,q, K, nu, sigma, R_0, S_0, I_0, C_0 , inital_proportion_a_n, initial_e_b, T, steps ,cstar, plot):
+    # Just initialing does everything but ode_details. This is because I wanted to generate the plots and tables in one go. If you want to just generate the table, you can just call the method after initializing the class with plot = False
+    def __init__(self, r, gamma, alpha, beta, a, b, delta, p,q, K, nu,xi, sigma, R_0, S_0, I_0, C_0 , inital_proportion_a_n, initial_e_b, T, steps ,cstar, plot):
         self.r = r
         self.gamma = gamma
         self.alpha = alpha
@@ -31,16 +32,19 @@ class LotkaVolterraModel:
         self.dt = T/steps
         self.p = p
         self.q = q
+        self.xi = xi 
+        self.starsigma = sigma / sqrt(cstar)  # scaled sigma for the SDE compartments
         # Time points on which all the compartments are solved in
         self.T = T
         self.t = np.linspace(0, T, steps)
         self.N = len(self.t)
-        
         self.cstar = cstar
+        
         self.inital_proportion_a_n = inital_proportion_a_n
         self.initial_e_b = initial_e_b
         self.apoptotic_start , self.necrotic_start = (C_0 * self.inital_proportion_a_n)/self.cstar, (C_0 * (1-self.inital_proportion_a_n))/self.cstar
         self.evasive_start , self.baseline_start = (C_0 * self.initial_e_b)/self.cstar, (C_0 * (1-self.initial_e_b))/self.cstar
+        
         
         # Solves the General Lotka-Volterra model and adds the results in the class variables
         self.solve(self.t)
@@ -50,38 +54,38 @@ class LotkaVolterraModel:
         form of the drift. The lists are then fed to a plot method to generate the pretty plots
         '''
         
-        # Solve the Necrosis and Apoptosis Biomarker compartments using IID noise numerically
+        # Solve the Necrosis and Apoptosis Ct-DNA compartments using IID noise numerically
         dWt = np.random.normal(0, np.sqrt(self.dt), self.N) # Generates a matrix with brownian steps)
         necrosis_num = self.solve_compartment(self.necrosis_f,  self.nu, self.necrotic_start, dWt) # Uses the newly generated dWt to solve the sde numerically
         dWt = np.random.normal(0, np.sqrt(self.dt), self.N) # Generates a new independent matrix with brownian steps)
         apoptosis_num = self.solve_compartment(self.apoptosis_f,  self.nu, self.apoptotic_start, dWt) # Uses the newly generated dWt to solve the sde numerically
 
-        # Solve the Baseline and Evasive Biomarker compartments using IID noise numerically
+        # Solve the Baseline and Evasive Ct-DNA compartments using IID noise numerically
         dWt = np.random.normal(0, np.sqrt(self.dt), self.N)
-        evasive_num = self.solve_compartment(self.Biomarker_Evasive, self.nu, self.evasive_start, dWt)
+        evasive_num = self.solve_compartment(self.Ct_DNA_Evasive, self.nu, self.evasive_start, dWt)
         dWt = np.random.normal(0, np.sqrt(self.dt), self.N)
-        baseline_num = self.solve_compartment( self.Biomarker_Baseline, self.nu, self.baseline_start, dWt)
+        baseline_num = self.solve_compartment( self.Ct_DNA_Baseline, self.nu, self.baseline_start, dWt)
 
         # Solve the Evasive release mechs under same noise
         dWt = np.random.normal(0, np.sqrt(self.dt), self.N) # Generates a matrix with brownian steps)
-        necrosis_evasive_num = self.solve_compartment(self.Biomarker_evasive_necrosis, self.nu, self.necrotic_start * self.initial_e_b, dWt) # Uses the same dWt to solve the sde numerically
-        apoptosis_evasive_num = self.solve_compartment( self.Biomarker_evasive_apoptosis, self.nu, self.apoptotic_start * self.initial_e_b , dWt)        
+        necrosis_evasive_num = self.solve_compartment(self.Ct_DNA_evasive_necrosis, self.nu, self.necrotic_start * self.initial_e_b, dWt) # Uses the same dWt to solve the sde numerically
+        apoptosis_evasive_num = self.solve_compartment( self.Ct_DNA_evasive_apoptosis, self.nu, self.apoptotic_start * self.initial_e_b , dWt)        
 
         # Solve the Baseline release mechs under same noise
         dWt = np.random.normal(0, np.sqrt(self.dt), self.N)
-        necrosis_baseline_num = self.solve_compartment(self.Biomarker_baseline_necrosis, self.nu, self.necrotic_start*(1-self.initial_e_b), dWt)
-        apoptosis_baseline_num = self.solve_compartment( self.Biomarker_baseline_apoptosis, self.nu, self.apoptotic_start*(1-self.initial_e_b), dWt)        
+        necrosis_baseline_num = self.solve_compartment(self.Ct_DNA_baseline_necrosis, self.nu, self.necrotic_start*(1-self.initial_e_b), dWt)
+        apoptosis_baseline_num = self.solve_compartment( self.Ct_DNA_baseline_apoptosis, self.nu, self.apoptotic_start*(1-self.initial_e_b), dWt)        
 
-        '''Path Solution for Baseline and Evasive Biomarker compartments. This one requires the full trajectory rather than just rates change. As such
+        '''Path Solution for Baseline and Evasive Ct-DNA compartments. This one requires the full trajectory rather than just rates change. As such
         I made a method called simulate_brownian motion for this. 
         '''
         # Monte Carlo Simulation of the path solution using different noise
         self.W = self._simulate_brownian_motion() # Generates full trajectory and saves it as a class variable
-        evasive_path =  self._simulate_paths( self.Biomarker_Evasive, self.evasive_start ) # Generates path solution using the analytical formula vis Euler Maruyama
+        evasive_path =  self._simulate_paths( self.Ct_DNA_Evasive, self.evasive_start ) # Generates path solution using the analytical formula vis Euler Maruyama
         self.W = self._simulate_brownian_motion()
-        baseline_path =  self._simulate_paths( self.Biomarker_Baseline ,self.baseline_start)
+        baseline_path =  self._simulate_paths( self.Ct_DNA_Baseline ,self.baseline_start)
 
-        # Path Solution for Baseline and Evasive Biomarker compartments using different noise
+        # Path Solution for Baseline and Evasive Ct-DNA compartments using different noise
         self.W = self._simulate_brownian_motion()
         necrosis_path =  self._simulate_paths( self.necrosis_f,self.necrotic_start )
         self.W = self._simulate_brownian_motion()
@@ -89,20 +93,41 @@ class LotkaVolterraModel:
 
         # Path Solution for evasive compartments with same noise
         self.W = self._simulate_brownian_motion()
-        necrosis_evasive_path =  self._simulate_paths( self.Biomarker_evasive_necrosis,self.necrotic_start * self.initial_e_b )
-        apoptosis_evasive_path =  self._simulate_paths( self.Biomarker_evasive_apoptosis ,self.apoptotic_start * self.initial_e_b)
+        necrosis_evasive_path =  self._simulate_paths( self.Ct_DNA_evasive_necrosis,self.necrotic_start * self.initial_e_b )
+        apoptosis_evasive_path =  self._simulate_paths( self.Ct_DNA_evasive_apoptosis ,self.apoptotic_start * self.initial_e_b)
         
         # Path Solution for baseline compartments with same noise
         self.W = self._simulate_brownian_motion()
-        necrosis_baseline_path =  self._simulate_paths( self.Biomarker_baseline_necrosis,self.necrotic_start*(1-self.initial_e_b) )
-        apoptosis_baseline_path =  self._simulate_paths( self.Biomarker_baseline_apoptosis ,self.apoptotic_start*(1-self.initial_e_b))
+        necrosis_baseline_path =  self._simulate_paths( self.Ct_DNA_baseline_necrosis,self.necrotic_start*(1-self.initial_e_b) )
+        apoptosis_baseline_path =  self._simulate_paths( self.Ct_DNA_baseline_apoptosis ,self.apoptotic_start*(1-self.initial_e_b))
+        
+                # Necrosis / Apoptosis
+        dWt = np.random.normal(0, np.sqrt(self.dt), self.N)
+        necrosis_num_sqrt  = self.solve_compartment_sqrt(self.necrosis_f,  self.nu, self.necrotic_start, dWt)
+
+        dWt = np.random.normal(0, np.sqrt(self.dt), self.N)
+        apoptosis_num_sqrt = self.solve_compartment_sqrt(self.apoptosis_f, self.nu, self.apoptotic_start, dWt)
+
+        # Baseline / Evasive
+        dWt = np.random.normal(0, np.sqrt(self.dt), self.N)
+        evasive_num_sqrt   = self.solve_compartment_sqrt(self.Ct_DNA_Evasive,  self.nu, self.evasive_start, dWt)
+
+        dWt = np.random.normal(0, np.sqrt(self.dt), self.N)
+        baseline_num_sqrt  = self.solve_compartment_sqrt(self.Ct_DNA_Baseline, self.nu, self.baseline_start, dWt)
 
         # Mean and Variance of the solution for different drift f. Currently evasive and baseline
-        mean_path_evasive= np.array([self.Mean_SDE_compartment(t,self.Biomarker_Evasive,self.evasive_start) for t in self.t])
-        var_path_evasive = np.array([self.Var_SDE_compartment(t,self.Biomarker_Evasive, mean_path_evasive,self.evasive_start) for t in self.t])
-        mean_path_baseline= np.array([self.Mean_SDE_compartment(t,self.Biomarker_Baseline,self.baseline_start) for t in self.t])
-        var_path_baseline = np.array([self.Var_SDE_compartment(t,self.Biomarker_Baseline, mean_path_baseline,self.baseline_start) for t in self.t])
+        mean_path_evasive= np.array([self.Mean_SDE_compartment(t,self.Ct_DNA_Evasive,self.evasive_start) for t in self.t])
+        var_path_evasive = np.array([self.Var_SDE_compartment(t,self.Ct_DNA_Evasive, mean_path_evasive,self.evasive_start) for t in self.t])
+        mean_path_baseline= np.array([self.Mean_SDE_compartment(t,self.Ct_DNA_Baseline,self.baseline_start) for t in self.t])
+        var_path_baseline = np.array([self.Var_SDE_compartment(t,self.Ct_DNA_Baseline, mean_path_baseline,self.baseline_start) for t in self.t])
+        
+        # Mean and Variance of the solution for different drift f. Currently evasive and baseline
+        mean_path_evasive_sqrt= np.array([self.Mean_SDE_compartment(t,self.Ct_DNA_Evasive,self.evasive_start,hat=True) for t in self.t])
+        mean_path_baseline_sqrt= np.array([self.Mean_SDE_compartment(t,self.Ct_DNA_Baseline,self.baseline_start,hat=True) for t in self.t])
 
+        var_path_evasive_sqrt = np.array([self.Var_SDE_hatf(t,self.Ct_DNA_Evasive, mean_path_evasive_sqrt,self.evasive_start) for t in self.t])
+        var_path_baseline_sqrt = np.array([self.Var_SDE_hatf(t,self.Ct_DNA_Baseline, mean_path_baseline_sqrt,self.baseline_start) for t in self.t])
+        
         # Plotting is based on order
         if plot:
             logging.info("plotting")    
@@ -115,8 +140,13 @@ class LotkaVolterraModel:
                             necrosis_baseline_num,apoptosis_baseline_num,
                             necrosis_evasive_path,apoptosis_evasive_path,
                             necrosis_baseline_path,apoptosis_baseline_path,
-                            mean_path_baseline, var_path_baseline)
-        
+                            mean_path_baseline, var_path_baseline,
+                            necrosis_num_sqrt,apoptosis_num_sqrt,
+                            evasive_num_sqrt,baseline_num_sqrt,
+                            mean_path_evasive_sqrt,mean_path_baseline_sqrt,
+                            var_path_evasive_sqrt,var_path_baseline_sqrt
+                            )
+
     def model(self, y, t):
         ''' 
         The general model - T1 Evasive, T2 Baseline, I Immune
@@ -138,32 +168,32 @@ class LotkaVolterraModel:
     functions for different release mechanisms: In terms of the table, the first four represent the four entries and the last
     five represent the linear combination of interest for us
     '''
-    def Biomarker_evasive_apoptosis(self, t):
+    def Ct_DNA_evasive_apoptosis(self, t):
         return (self.alpha * self.T1[t] * self.I[t])/ self.cstar
         
-    def Biomarker_evasive_necrosis(self, t):
+    def Ct_DNA_evasive_necrosis(self, t):
         return (self.r * self.T1[t]  * ( (self.T1[t] + self.p * self.T2[t]) / self.K))/ self.cstar
     
-    def Biomarker_baseline_apoptosis(self, t):
+    def Ct_DNA_baseline_apoptosis(self, t):
         return  (self.beta * self.T2[t] * self.I[t] )/ self.cstar
     
-    def Biomarker_baseline_necrosis(self, t):
+    def Ct_DNA_baseline_necrosis(self, t):
         return (self.gamma * self.T2[t]* (  (self.q * self.T1[t] + self.T2[t]) / self.K))/ self.cstar
       
-    def Biomarker_Evasive(self, t):
-        return  self.Biomarker_evasive_apoptosis(t) + self.Biomarker_evasive_necrosis(t) 
+    def Ct_DNA_Evasive(self, t):
+        return  self.Ct_DNA_evasive_apoptosis(t) + self.Ct_DNA_evasive_necrosis(t) 
 
-    def Biomarker_Baseline(self, t):
-        return  self.Biomarker_baseline_apoptosis(t) + self.Biomarker_baseline_necrosis(t) 
+    def Ct_DNA_Baseline(self, t):
+        return  self.Ct_DNA_baseline_apoptosis(t) + self.Ct_DNA_baseline_necrosis(t) 
 
     def apoptosis_f(self, t):
-        return self.Biomarker_evasive_apoptosis(t) + self.Biomarker_baseline_apoptosis(t)
+        return self.Ct_DNA_evasive_apoptosis(t) + self.Ct_DNA_baseline_apoptosis(t)
 
     def necrosis_f(self, t):
-        return  self.Biomarker_evasive_necrosis(t) + self.Biomarker_baseline_necrosis(t) 
+        return  self.Ct_DNA_evasive_necrosis(t) + self.Ct_DNA_baseline_necrosis(t) 
 
     def all_compartments(self,t):
-        return self.Biomarker_evasive_apoptosis(t) + self.Biomarker_baseline_apoptosis(t) + self.Biomarker_evasive_necrosis(t) + self.Biomarker_baseline_necrosis(t) 
+        return self.Ct_DNA_evasive_apoptosis(t) + self.Ct_DNA_baseline_apoptosis(t) + self.Ct_DNA_evasive_necrosis(t) + self.Ct_DNA_baseline_necrosis(t) 
 
 
     def solve_compartment(self, compartment_f,nu, initial,dWt):
@@ -178,13 +208,42 @@ class LotkaVolterraModel:
     
     def _simulate_brownian_motion(self):
         '''
-        Generates one trajectory for brownian motion. We do the same thing as generate dW here. In addtion, we cumsum them
+        Generates one trajectory for brownian motion. We do the same thing as generate dW here. In addition, we cumsum them
         to get the array for the brownian path. 
         '''
         dW = np.random.normal(0, np.sqrt(self.dt), self.N - 1)
         W = np.cumsum(dW)
         W = np.insert(W, 0, 0)  # Insert W(0) = 0
         return W
+    
+    def solve_compartment_sqrt(self, compartment_f, nu, initial, dWt):
+        """
+        Full-truncation Euler for: dC = ( (f(i) + xi) - nu*C ) dt + sigma*sqrt(C) dW
+        where compartment_f(i) is index-based (i = 0,1,...).
+        
+        Full truncation:
+        - drift uses max(C,0)
+        - diffusion uses sqrt(max(C,0))
+        This keeps the scheme stable and avoids sqrt of negative values.
+        """
+        C = np.zeros(self.N, dtype=float)
+        C[0] = max(float(initial), 0.0)
+
+        for i in range(1, self.N):
+            C_prev = C[i-1]
+            C_pos = max(C_prev, 0.0)
+
+            fhat = compartment_f(i-1) + self.xi 
+            drift = (fhat - nu * C_pos) * self.dt
+            diff  = self.starsigma * np.sqrt(C_pos) * dWt[i-1]
+
+            C[i] = C_prev + drift + diff
+
+            # optional hard floor (often not needed with full truncation, but safe):
+            if C[i] < 0.0:
+                C[i] = 0.0
+
+        return C
 
     def _simulate_paths(self, compartment_f,initial):
         '''
@@ -204,85 +263,6 @@ class LotkaVolterraModel:
             C[i] += integral_term
         return C
     
-    def plot_combined(self, t, necrosis_num, apoptosis_num,
-                           evasive_num, baseline_num,
-                           evasive_path, baseline_path,
-                           necrosis_path,apoptosis_path,
-                           mean_path_evasive,var_path_evasive,
-                           necrosis_evasive_num, apoptosis_evasive_num,
-                           necrosis_baseline_num,apoptosis_baseline_num,
-                           necrosis_evasive_path,apoptosis_evasive_path,
-                           necrosis_baseline_path,apoptosis_baseline_path,
-                           mean_path_baseline, var_path_baseline):
-        fig, axs = plt.subplots(2, 2, figsize=(30, 12))
-        
-        ''' 
-        Plots stuff :) DEPRECATED
-        '''
-        axs[0, 0].plot(t, self.T1, label='Evasive Tumor (T1)')
-        axs[0, 0].plot(t, self.T2, label='Baseline (T2)')
-        axs[0, 0].plot(t, self.I, label='T-Cell (I)')
-        axs[0, 0].set_xlabel('Time')
-        axs[0, 0].set_ylabel('Population')
-        axs[0, 0].set_title('Lotka-Volterra Model with One Immune and Two Tumor Sub-Clones')
-        axs[0, 0].legend()
-        
-        axs[0, 1].plot(t, evasive_num + baseline_num, label='SDE Numerical', linestyle='--', color='pink')
-        axs[0, 1].plot(t, evasive_path + baseline_path, label='Path Solution',  color='red')
-        axs[0, 1].set_xlabel('Time')
-        axs[0, 1].set_ylabel('Biomarker abundance')
-        axs[0, 1].set_title('Cumulative Biomarker Diffusion (Path vs Numerical)')       
-        axs[0, 1].legend()
-        
-        axs[1, 0].plot(t, evasive_path, label='Evasive Clone (Path)', color='red')
-        axs[1, 0].plot(t, baseline_path, label='Baseline Clone (Path)', color='blue')
-        axs[1, 0].plot(t, evasive_num, label='Evasive Clone (Numerical)', linestyle='--', color='pink')
-        axs[1, 0].plot(t, baseline_num, label='Baseline Clone (Numerical)', linestyle='--', color='skyblue')
-        axs[1, 0].set_xlabel('Time')
-        axs[1, 0].set_ylabel('Biomarker abundance')
-        axs[1, 0].set_title('Biomarker Diffusion via Clonal Source(Path vs Numerical Solution)')
-        axs[1, 0].legend()
-        
-        
-        axs[1, 1].plot(t, necrosis_path, label='Necrotic Biomarker abundance (Path)', color='red')
-        axs[1, 1].plot(t, apoptosis_path, label='Apoptotic Biomarker abundance (Path)', color='blue')
-        axs[1, 1].plot(t, necrosis_num, label='Necrotic Biomarker abundance (Numerical)', linestyle='--', color='pink')
-        axs[1, 1].plot(t, apoptosis_num, label='Apoptotic Biomarker abundance (Numerical)', linestyle='--', color='skyblue')
-        axs[1, 1].set_xlabel('Time')
-        axs[1, 1].set_ylabel('Biomarker abundance')
-        axs[1, 1].set_title('Biomarker Diffusion (Path vs Numerical Solution)')
-        axs[1, 1].legend()
-                
-        plt.tight_layout(rect=[0, 0, 1, 0.95])
-        fig.suptitle(f'r = {self.r}, gamma = {self.gamma}, alpha = {self.alpha}, beta = {self.beta}, a = {self.a}, b = {self.b}, delta = {self.delta}, K = {self.K}, nu = {self.nu}, sigma= {self.sigma}')
-        plt.show()
-        
-        fig, axs = plt.subplots(1, 2, figsize=(15, 6))
-        axs[0].plot(t, mean_path_evasive, label = 'Mean')
-        axs[0].set_title('Mean')
-        
-        axs[1].plot(t,var_path_evasive, label = 'Var')
-        axs[1].set_title('Var')
-               
-        for ax in axs:
-            ax.legend()
-        fig.suptitle('Mean and Variance Trajectory for Biomarker Evasive')
-        plt.show()
-        # Standard deviation from the Variance Trajectory (L)
-        std_dev_L = np.sqrt(np.maximum(var_path_evasive, 0))  # Avoiding negative values 
-
-        # Define the upper and lower bounds for the variance cone
-        upper_bound = mean_path_evasive + std_dev_L
-        lower_bound = mean_path_evasive - std_dev_L
-        plt.figure(figsize=(30, 12))
-        plt.plot(t, mean_path_evasive, label = 'Mean')
-        plt.title('Mean with var cone')
-        plt.fill_between(t, lower_bound, upper_bound, color='skyblue', alpha=0.2, label='± 1 Std-dev')
-        plt.plot(t, evasive_num, label='Evasive Clone (Numerical)', linestyle='--', color='pink')
-        plt.plot(t, evasive_path, label='Evasive Clone (Path)', color='lightgreen')
-        plt.show()
-        
-        
     def ode_details(self):
         '''     
         This generates the table of values of all equilibrium points given the analytical findings of the model. Our paper has strict inequality
@@ -389,7 +369,6 @@ class LotkaVolterraModel:
                 return "Does not exist"
             return "Stable" if stable else "Unstable"
 
-        # Applying the formatting
         formatted_eqpoints = [format_tuple(pt) for pt in eqpoints]
         formatted_existance = [format_existance(ex) for ex in existence]
         formatted_stability = [format_stability(stab, ex) for stab, ex in zip(stability, existence)]
@@ -440,18 +419,21 @@ class LotkaVolterraModel:
         C = term1 + term2 + term3
         return C
     
-    def Mean_SDE_compartment(self, t, compartment_f,start_c0):
+    def Mean_SDE_compartment(self, t, compartment_f,start_c0,hat = False):
         '''
         Generates the Mean trajectory using the analytical formula
-        using diffent compartment entries
+        using different compartment entries
         I use the trapezium rule to generate the integrals 
         '''
         # Find the indices in t_values where s <= t
         indices = np.where(self.t <= t)[0]
         # Extract corresponding s values and f(s) values
         s_values = self.t[indices]
-        f_values = np.array([compartment_f(s) for s in indices])
-        
+        if hat == False:
+            f_values = np.array([compartment_f(s) for s in indices])
+        else:
+            f_values = np.array([compartment_f(s)  for s in indices]) + self.xi
+
         # Calculate the integrand e^{-\eta (t - s)}
         integrand = f_values * np.exp(- self.nu * (t - s_values))
         
@@ -464,29 +446,61 @@ class LotkaVolterraModel:
     def Var_SDE_compartment(self,t, compartment_f, compartment_mean,start_c0):
         '''
         Generates the Variance trajectory using the analytical formula
-        using diffent compartment entries
+        using different compartment entries
         I use the trapezium rule to generate the integrals 
         '''
         
-        # First and last term
         term1 = start_c0**2 * np.exp((self.sigma**2 - 2 * self.nu) * t)
         term3 = pow(self.Mean_SDE_compartment(t, compartment_f,start_c0),2)
         
-        # Second term: Integral term
         indices = np.where(self.t <= t)[0]
         s_values = self.t[indices]
         
         f_values = np.array([compartment_f(idx) for idx in indices])
         m_values = np.array([compartment_mean[idx] for idx in indices])
         
-        # Calculate the integrand 2 * e^{(\sigma^2 - 2\nu)(t - s)} * m(s) * f(s)
         integrand = 2 * np.exp((self.sigma**2 - 2 * self.nu) * (t - s_values)) * m_values * f_values
         
         integral = np.trapz(integrand, s_values)    
         
-        # Variance calculation
         variance = term1 - term3 + integral
         return variance
+    
+    def Var_SDE_hatf(self, t, compartment_f, compartment_mean, start_c0):
+        """
+        Generates the Variance trajectory using the analytical formula for the SDE with hatf drift, which can be negative.
+        This is based on the formula derived in the Appendix, and uses the trapezoidal rule for numerical integration.
+        """
+        indices = np.where(self.t <= t)[0]
+        s_values = self.t[indices]              
+        i = indices[-1]                          
+
+        m_values = np.array([compartment_mean[idx] for idx in indices], dtype=float)
+        m_t = compartment_mean[i]
+
+        fhat_values = np.array([compartment_f(idx) for idx in indices], dtype=float) + self.xi
+
+        term1 = (start_c0 ** 2) * np.exp(-2.0 * self.nu * t)
+
+        integrand = (2.0 * fhat_values + self.starsigma **2) * np.exp(-2.0 * self.nu * (t - s_values)) * m_values
+        integral = np.trapz(integrand, s_values)
+
+        variance = term1 + integral - (m_t ** 2)
+        return variance
+    
+    def Var_SDE_hatf_stable(self, t, compartment_mean, start_c0):
+        """
+        Generates the Variance trajectory using the analytical formula for the stable SDE with hatf drift, 
+        which is guaranteed to be non-negative. This is based on the formula derived in the Appendix, and uses the trapezoidal rule for numerical integration.
+        """
+        indices = np.where(self.t <= t)[0]
+        s_values = self.t[indices]
+        m_values = np.array([compartment_mean[idx] for idx in indices], dtype=float)
+
+
+        integrand = (self.starsigma**2) * np.exp(-2.0 * self.nu * (t - s_values)) * m_values
+        V = np.trapz(integrand, s_values)  # since V(0)=0
+        return V
     
     def Mean_return_compartment(self, eqstate):
         '''
@@ -501,7 +515,7 @@ class LotkaVolterraModel:
         baseline_necrosis  = lambda E,B,I :(self.gamma * B* (  (self.q * E + B) / self.K))/ self.cstar
         fstar = evasive_apoptosis(*eqstate) + evasive_necrosis(*eqstate) + baseline_apoptosis(*eqstate) + baseline_necrosis(*eqstate)
         
-        p = lambda x : (2* fstar - self.nu *x) / (pow(self.sigma * x,2))
+        p = lambda x : 2*( fstar - self.nu *x) / (pow(self.sigma * x,2))
         q = lambda x : (-2) / (pow(self.sigma * x,2))
         
         def inner_integral(v, y):
@@ -517,14 +531,10 @@ class LotkaVolterraModel:
             # Perform the double integral
             result, error = dblquad(lambda y, v: integrand(v, y, x0), x0, 1, lambda v: x0, lambda v: v)
 
-            # Multiply by -1 as per the equation
             final_result = -result
             return_time_start[x0]= final_result
             
         return return_time_start, fstar
-    
-    def Simulate_mean_return(self,eqstate):
-        pass
    
     def plot_paper(self, t, necrosis_num, apoptosis_num,
                            evasive_num, baseline_num,
@@ -535,10 +545,14 @@ class LotkaVolterraModel:
                            necrosis_baseline_num,apoptosis_baseline_num,
                            necrosis_evasive_path,apoptosis_evasive_path,
                            necrosis_baseline_path,apoptosis_baseline_path,
-                           mean_path_baseline, var_path_baseline): 
+                           mean_path_baseline, var_path_baseline,
+                           necrosis_num_sqrt,apoptosis_num_sqrt,
+                           evasive_num_sqrt,baseline_num_sqrt, 
+                           mean_path_evasive_sqrt,mean_path_baseline_sqrt,
+                           var_path_evasive_sqrt,var_path_baseline_sqrt ):
         
         '''
-        Plots paper
+        Plots to use for the paper
         '''
         
         plt.figure(figsize=(10, 4))
@@ -551,6 +565,7 @@ class LotkaVolterraModel:
         plt.legend()
         plt.show
         
+        text_fontsize = 13
         fig = plt.figure(figsize=(20, 24))
         gs = gridspec.GridSpec(4, 2, height_ratios=[1, 1, 1, 1], width_ratios=[1, 1])
 
@@ -558,17 +573,18 @@ class LotkaVolterraModel:
         ax1.plot(t, self.T1, label='Evasive Tumor ($E$)')
         ax1.plot(t, self.T2, label='Baseline Tumor ($B$)')
         ax1.plot(t, self.I, label='Immune ($I$)')
-        ax1.set_xlabel('Time')
-        ax1.set_ylabel('Population')
+        ax1.set_xlabel('Time',fontsize=text_fontsize)
+        ax1.set_ylabel('Population',fontsize=text_fontsize)
         ax1.set_title('Lotka-Volterra Model with One Immune and Two Tumor Sub-Clones')
         ax1.legend()
 
         ax2 = plt.subplot(gs[1, 0])
         ax2.plot(t, evasive_num + baseline_num, label='SDE Numerical', linestyle='--', color='pink')
         ax2.plot(t, evasive_path + baseline_path, label='Path Solution',  color='red')
-        ax2.set_xlabel('Time')
-        ax2.set_ylabel('Biomarker abundance')
-        ax2.set_title('Cumulative Biomarker Diffusion (Path vs Numerical)')       
+        ax2.plot(t, evasive_num_sqrt + baseline_num_sqrt, label='SDE Numerical (sqrt)', linestyle='--', color='purple')
+        ax2.set_xlabel('Time',fontsize=text_fontsize)
+        ax2.set_ylabel('Biomarker abundance',fontsize=text_fontsize)
+        ax2.set_title('Cumulative Biomarker Diffusion (Path and Numerical)')       
         ax2.legend()
 
         ax3 = plt.subplot(gs[1, 1])
@@ -576,19 +592,28 @@ class LotkaVolterraModel:
         ax3.plot(t, apoptosis_path, label='Apoptotic Biomarker abundance (Path)', color='blue')
         ax3.plot(t, necrosis_num, label='Necrotic Biomarker abundance (Numerical)', linestyle='--', color='pink')
         ax3.plot(t, apoptosis_num, label='Apoptotic Biomarker abundance (Numerical)', linestyle='--', color='skyblue')
-        ax3.set_xlabel('Time')
-        ax3.set_ylabel('Biomarker abundance')
-        ax3.set_title('Biomarker Diffusion (Path vs Numerical Solution)')
-        ax3.legend()
+        ax3.plot(t, necrosis_num_sqrt,
+         label='Necrotic Biomarker (Num, sqrt)', linestyle='--', color='purple')
+        ax3.plot(t, apoptosis_num_sqrt,
+                label='Apoptotic Biomarker (Num, sqrt)', linestyle='--', color='orchid')
 
+        ax3.set_xlabel('Time',fontsize=text_fontsize)
+        ax3.set_ylabel('Biomarker abundance',fontsize=text_fontsize)
+        ax3.set_title('Biomarker Diffusion (Path and Numerical Solution)')
+        ax3.legend()
+                               
         ax4 = plt.subplot(gs[2, 0])
         ax4.plot(t, evasive_path, label='Evasive Clone (Path)', color='red')
         ax4.plot(t, baseline_path, label='Baseline Clone (Path)', color='blue')
         ax4.plot(t, evasive_num, label='Evasive Clone (Num)', linestyle='--', color='pink')
         ax4.plot(t, baseline_num, label='Baseline Clone (Num)', linestyle='--', color='skyblue')
-        ax4.set_xlabel('Time')
-        ax4.set_ylabel('Biomarker Proportion wrt $C^*$')
-        ax4.set_title('Biomarker Diffusion via Clonal Source(Path vs Numerical)')
+        ax4.plot(t, evasive_num_sqrt,
+         label='Evasive Clone (Num, sqrt)', linestyle='--', color='purple')
+        ax4.plot(t, baseline_num_sqrt,  
+         label='Baseline Clone (Num, sqrt)', linestyle='--', color='orchid')
+        ax4.set_xlabel('Time',fontsize=text_fontsize)
+        ax4.set_ylabel('Biomarker Proportion wrt $C^*$',fontsize=text_fontsize)
+        ax4.set_title('Biomarker Diffusion via Clonal Source(Path and Numerical)')
         ax4.legend()
 
         ax5 = plt.subplot(gs[2, 1])
@@ -602,38 +627,148 @@ class LotkaVolterraModel:
         ax5.plot(t, necrosis_baseline_path, label='N Baseline (Path)',  color= 'darkorange')
         ax5.plot(t, apoptosis_baseline_path, label='A Baseline (Path)', color='black')
         
-        ax5.set_xlabel('Time')
-        ax5.set_ylabel('Biomarker Proportion wrt $C^*$')
-        ax5.set_title('Biomarker Diffusion via Mechanism Source (Path vs Numerical Solution)')
+        ax5.set_xlabel('Time',fontsize=text_fontsize)
+        ax5.set_ylabel('Biomarker Proportion wrt $C^*$',fontsize=text_fontsize)
+        ax5.set_title('Biomarker Diffusion via Mechanism Source ')
         ax5.legend()
-
-        ax6 = plt.subplot(gs[3, :])
-        # Standard deviation from the Variance Trajectory (L)
-        std_dev_evasive = np.sqrt(np.maximum(var_path_evasive, 0))  # Avoiding negative values 
-
-        # Define the upper and lower bounds for the variance cone
+        
+        ax6 = plt.subplot(gs[3, 0])
+        std_dev_evasive = np.sqrt(np.maximum(var_path_evasive, 0))
         upper_bound_evasive = mean_path_evasive + std_dev_evasive
         lower_bound_evasive = mean_path_evasive - std_dev_evasive
-        
-        std_dev_baseline = np.sqrt(np.maximum(var_path_baseline, 0))  # Avoiding negative values 
 
-        # Define the upper and lower bounds for the variance cone
+        std_dev_baseline = np.sqrt(np.maximum(var_path_baseline, 0))
         upper_bound_baseline = mean_path_baseline + std_dev_baseline
         lower_bound_baseline = mean_path_baseline - std_dev_baseline
-        ax6.plot(t, mean_path_evasive, label = 'Evasive Mean', color='darkred')
-        ax6.plot(t, mean_path_baseline, label = 'Baseline Mean', color='darkblue')
-        ax6.set_title('Biomarker Diffusion by Clonal source with mean and variance cone')
-        ax6.fill_between(t, lower_bound_evasive, upper_bound_evasive, color='lightcoral', alpha=0.2, label='Evasive ± 1 Std-dev')
-        ax6.fill_between(t, lower_bound_baseline, upper_bound_baseline, color='lightskyblue', alpha=0.2, label='Baseline ± 1 Std-dev')
-        ax6.plot(t, evasive_num, label='Evasive (Num)', linestyle='--', color='pink')
-        ax6.plot(t, evasive_path, label='Evasive (Path)', color='red')
-        ax6.plot(t, baseline_num, label='Baseline (Num)', linestyle='--', color='deepskyblue')
-        ax6.plot(t, baseline_path, label='Baseline (Path)', color='dodgerblue')
-        ax6.legend()   
+
+        ax6.plot(t, mean_path_evasive, label='Evasive Mean', color='darkred')
+        ax6.plot(t, mean_path_baseline, label='Baseline Mean', color='darkblue')
+
+        ax6.fill_between(
+            t, lower_bound_evasive, upper_bound_evasive,
+            color='lightcoral', alpha=0.2, label='Evasive ± 1 Std-dev'
+        )
+        ax6.fill_between(
+            t, lower_bound_baseline, upper_bound_baseline,
+            color='lightskyblue', alpha=0.2, label='Baseline ± 1 Std-dev'
+        )
+
+        ax6.plot(t, evasive_num, '--', color='pink', label='Evasive (Num)')
+        ax6.plot(t, evasive_path, color='red', label='Evasive (Path)')
+        ax6.plot(t, baseline_num, '--', color='deepskyblue', label='Baseline (Num)')
+        ax6.plot(t, baseline_path, color='dodgerblue', label='Baseline (Path)')
+
+        ax6.set_title('Geometric Biomarker Diffusion with Mean and Variance Cone')
+        ax6.set_xlabel('Time',fontsize=text_fontsize)
+        ax6.set_ylabel('Biomarker Proportion',fontsize=text_fontsize)
+        ax6.legend()
+        ax6.grid(alpha=0.3)
+        
+        
+        ax7 = plt.subplot(gs[3, 1])
+        std_dev_evasive_sqrt = np.sqrt(np.maximum(var_path_evasive_sqrt, 0))
+        upper_bound_evasive_sqrt = mean_path_evasive_sqrt + std_dev_evasive_sqrt
+        lower_bound_evasive_sqrt = mean_path_evasive_sqrt - std_dev_evasive_sqrt
+
+        std_dev_baseline_sqrt = np.sqrt(np.maximum(var_path_baseline_sqrt, 0))
+        upper_bound_baseline_sqrt = mean_path_baseline_sqrt + std_dev_baseline_sqrt
+        lower_bound_baseline_sqrt = mean_path_baseline_sqrt - std_dev_baseline_sqrt
+
+        ax7.fill_between(
+            t, lower_bound_evasive_sqrt, upper_bound_evasive_sqrt,
+            color='lightcoral', alpha=0.2, label='Evasive ± 1 Std-dev'
+        )
+        ax7.fill_between(
+            t, lower_bound_baseline_sqrt, upper_bound_baseline_sqrt,
+            color='lightskyblue', alpha=0.2, label='Baseline ± 1 Std-dev'
+        )
+
+        ax7.plot(t, mean_path_evasive_sqrt, label='Evasive Mean', color='darkred')
+        ax7.plot(t, mean_path_baseline_sqrt, label='Baseline Mean', color='darkblue')
+        ax7.plot(t, evasive_num_sqrt, '--', color='pink', label='Evasive')
+        ax7.plot(t, baseline_num_sqrt, '--', color='deepskyblue', label='Baseline')
+
+        ax7.set_title('Square Root Biomarker Diffusion with Mean and Variance Cone')
+        ax7.set_xlabel('Time',fontsize=text_fontsize)
+        ax7.set_ylabel('Biomarker Proportion',fontsize=text_fontsize)
+        ax7.legend()
+        ax7.grid(alpha=0.3)
+        
+        
         fig.suptitle(f'r = {self.r}, gamma = {self.gamma}, alpha = {self.alpha}, beta = {self.beta}, a = {self.a}, b = {self.b}, delta = {self.delta}, p = {self.p} , q = {self.q}, K = {self.K}, nu = {self.nu}, sigma= {self.sigma}, ($E_0$, $B_0$, $I_0$)= ({self.initial_conditions[0]}, {self.initial_conditions[1]}, {self.initial_conditions[2]}), $C_0$ = {self.apoptotic_start}, T = {self.T}, $C^*$ = {self.cstar}')
         plt.tight_layout(rect=[0, 0, 1, 0.97])
 
         plt.show()
+        
+        fig, (ax1, ax2) = plt.subplots(
+            2, 1, figsize=(10, 8), sharex=True
+        )
+
+        # ---------- Top plot  ----------
+
+        std_dev_evasive = np.sqrt(np.maximum(var_path_evasive, 0))
+        upper_bound_evasive = mean_path_evasive + std_dev_evasive
+        lower_bound_evasive = mean_path_evasive - std_dev_evasive
+
+        std_dev_baseline = np.sqrt(np.maximum(var_path_baseline, 0))
+        upper_bound_baseline = mean_path_baseline + std_dev_baseline
+        lower_bound_baseline = mean_path_baseline - std_dev_baseline
+
+        ax1.plot(t, mean_path_evasive, label='Evasive Mean', color='darkred')
+        ax1.plot(t, mean_path_baseline, label='Baseline Mean', color='darkblue')
+
+        ax1.fill_between(
+            t, lower_bound_evasive, upper_bound_evasive,
+            color='lightcoral', alpha=0.2, label='Evasive ± 1 Std-dev'
+        )
+        ax1.fill_between(
+            t, lower_bound_baseline, upper_bound_baseline,
+            color='lightskyblue', alpha=0.2, label='Baseline ± 1 Std-dev'
+        )
+
+        ax1.plot(t, evasive_num, '--', color='pink', label='Evasive (Num)')
+        ax1.plot(t, evasive_path, color='red', label='Evasive (Path)')
+        ax1.plot(t, baseline_num, '--', color='deepskyblue', label='Baseline (Num)')
+        ax1.plot(t, baseline_path, color='dodgerblue', label='Baseline (Path)')
+
+        ax1.set_title('Geometric Ct-DNA Diffusion with\nMean and Variance Cone')
+        ax1.legend()
+        ax1.grid(alpha=0.3)
+
+        # ---------- Bottom plot -------------
+        std_dev_evasive_sqrt = np.sqrt(np.maximum(var_path_evasive_sqrt, 0))
+        upper_bound_evasive_sqrt = mean_path_evasive_sqrt + std_dev_evasive_sqrt
+        lower_bound_evasive_sqrt = mean_path_evasive_sqrt - std_dev_evasive_sqrt
+
+        std_dev_baseline_sqrt = np.sqrt(np.maximum(var_path_baseline_sqrt, 0))
+        upper_bound_baseline_sqrt = mean_path_baseline_sqrt + std_dev_baseline_sqrt
+        lower_bound_baseline_sqrt = mean_path_baseline_sqrt - std_dev_baseline_sqrt
+        
+        ax2.fill_between(
+            t, lower_bound_evasive_sqrt, upper_bound_evasive_sqrt,
+            color='lightcoral', alpha=0.2, label='Evasive ± 1 Std-dev'
+        )
+        ax2.fill_between(
+            t, lower_bound_baseline_sqrt, upper_bound_baseline_sqrt,
+            color='lightskyblue', alpha=0.2, label='Baseline ± 1 Std-dev'
+        )
+        
+        ax2.plot(t, mean_path_evasive_sqrt, label='Evasive Mean', color='darkred')
+        ax2.plot(t, mean_path_baseline_sqrt, label='Baseline Mean', color='darkblue')
+        ax2.plot(t, evasive_num_sqrt, '--', color='pink', label='Evasive')
+        ax2.plot(t, baseline_num_sqrt, '--', color='deepskyblue', label='Baseline')
+
+        ax2.set_xlabel('Time')
+        ax2.set_ylabel('Ct-DNA Proportion')
+        ax2.set_title('Square Root Ct-DNA Diffusion with \nMean and Variance Cone')
+        ax2.legend()
+        ax2.grid(alpha=0.3)
+
+        plt.tight_layout()
+        plt.show()
+
+        
+        # Figure with two subplots side by side
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
 
         # First plot on the left (Lotka-Volterra Model)
@@ -646,26 +781,115 @@ class LotkaVolterraModel:
         ax1.legend()
 
         # Second plot on the right (Necrosis and Apoptosis Path and Num)
-        ax2.plot(t, necrosis_evasive_num, label='N Evasive (Num)', linestyle='--', color='pink')
-        ax2.plot(t, apoptosis_evasive_num, label='A Evasive (Num)', linestyle='--', color='skyblue')
-        ax2.plot(t, necrosis_baseline_num, label='N Baseline (Num)', linestyle='--', color='bisque')
-        ax2.plot(t, apoptosis_baseline_num, label='A Baseline (Num)', linestyle='--', color='silver')
-
-        ax2.plot(t, necrosis_evasive_path, label='N Evasive (Path)', color='red')
-        ax2.plot(t, apoptosis_evasive_path, label='A Evasive (Path)', color='blue')
-        ax2.plot(t, necrosis_baseline_path, label='N Baseline (Path)', color='darkorange')
-        ax2.plot(t, apoptosis_baseline_path, label='A Baseline (Path)', color='black')
+        ax2.plot(t, necrosis_evasive_num + necrosis_baseline_num, label='Necrosis (Geo)', linestyle='--', color='pink')
+        ax2.plot(t, apoptosis_evasive_num + apoptosis_baseline_num, label='Apoptosis (Geo)', linestyle='--', color='skyblue')
+        
+        ax2.plot(t, necrosis_num_sqrt, label='Necrosis (CIR)', color='red')
+        ax2.plot(t, apoptosis_num_sqrt, label='Apoptosis (CIR)', color='black')
 
         ax2.set_xlabel('Time')
-        ax2.set_ylabel('Biomarker Proportion')
-        ax2.set_title('Necrosis and Apoptosis (Path and Num)')
+        ax2.set_ylabel('Ct-Dna Proportion')
+        ax2.set_title('Necrosis and Apoptosis (Geometric vs CIR)')
+        ax2.legend()
+
 
         plt.tight_layout()
         plt.show()
         
+        ode_param_text = (
+        r"$r=%.2f,\ \gamma=%.2f,\ \alpha=%.2f,\ \beta=%.2f,$ "
+        r"$a=%.4f,\ b=%.2f,\ \delta=%.2f,$ "
+        r"$p=%.2f,\ q=%.2f,\ K=%.0f;$ "
+        r"$E_0=%.1f,\ B_0=%.1f,\ I_0=%.1f$"
+        % (self.r, self.gamma, self.alpha, self.beta, self.a, self.b, self.delta, self.p, self.q, self.K, self.initial_conditions[0], self.initial_conditions[1], self.initial_conditions[2])
+        )
+        param_text_geo = (
+        r"$\eta = %.3f,\ \sigma = %.3f$"
+        % (self.nu, self.sigma)
+        ) +  ode_param_text
+        # ---------- Figure 1: Geometric Ct-DNA Diffusion ----------
+
+        fig1, ax1 = plt.subplots(figsize=(10, 4))
+
+        std_dev_evasive = np.sqrt(np.maximum(var_path_evasive, 0))
+        upper_bound_evasive = mean_path_evasive + std_dev_evasive
+        lower_bound_evasive = mean_path_evasive - std_dev_evasive
+
+        std_dev_baseline = np.sqrt(np.maximum(var_path_baseline, 0))
+        upper_bound_baseline = mean_path_baseline + std_dev_baseline
+        lower_bound_baseline = mean_path_baseline - std_dev_baseline
+
+        ax1.plot(t, mean_path_evasive, label='Evasive Mean', color='darkred')
+        ax1.plot(t, mean_path_baseline, label='Baseline Mean', color='darkblue')
+
+        ax1.fill_between(
+            t, lower_bound_evasive, upper_bound_evasive,
+            color='lightcoral', alpha=0.2, label='Evasive ± 1 Std-dev'
+        )
+        ax1.fill_between(
+            t, lower_bound_baseline, upper_bound_baseline,
+            color='lightskyblue', alpha=0.2, label='Baseline ± 1 Std-dev'
+        )
+
+        ax1.plot(t, evasive_num, '--', color='pink', label='Evasive (Num)')
+        ax1.plot(t, evasive_path, color='red', label='Evasive (Path)')
+        ax1.plot(t, baseline_num, '--', color='deepskyblue', label='Baseline (Num)')
+        ax1.plot(t, baseline_path, color='dodgerblue', label='Baseline (Path)')
+
+        ax1.set_title('Geometric Ct-DNA Diffusion with Mean and Variance Cone')
+        ax1.set_xlabel('Time')
+        ax1.set_ylabel('Ct-DNA Proportion')
+        ax1.legend()
+        ax1.grid(alpha=0.3)
+        fig1.text(0.5, 0.01, param_text_geo,
+          ha="center", va="bottom", fontsize=9)
+        plt.tight_layout(rect=[0, 0.08, 1, 1])
+        plt.show()
+        
+        
+        # ---------- Figure 2: Square Root Ct-DNA Diffusion ----------
+
+        fig2, ax2 = plt.subplots(figsize=(10, 4))
+
+        std_dev_evasive_sqrt = np.sqrt(np.maximum(var_path_evasive_sqrt, 0))
+        upper_bound_evasive_sqrt = mean_path_evasive_sqrt + std_dev_evasive_sqrt
+        lower_bound_evasive_sqrt = mean_path_evasive_sqrt - std_dev_evasive_sqrt
+
+        std_dev_baseline_sqrt = np.sqrt(np.maximum(var_path_baseline_sqrt, 0))
+        upper_bound_baseline_sqrt = mean_path_baseline_sqrt + std_dev_baseline_sqrt
+        lower_bound_baseline_sqrt = mean_path_baseline_sqrt - std_dev_baseline_sqrt
+
+        ax2.fill_between(
+            t, lower_bound_evasive_sqrt, upper_bound_evasive_sqrt,
+            color='lightcoral', alpha=0.2, label='Evasive ± 1 Std-dev'
+        )
+        ax2.fill_between(
+            t, lower_bound_baseline_sqrt, upper_bound_baseline_sqrt,
+            color='lightskyblue', alpha=0.2, label='Baseline ± 1 Std-dev'
+        )
+
+        ax2.plot(t, mean_path_evasive_sqrt, label='Evasive Mean', color='darkred')
+        ax2.plot(t, mean_path_baseline_sqrt, label='Baseline Mean', color='darkblue')
+        ax2.plot(t, evasive_num_sqrt, '--', color='pink', label='Evasive')
+        ax2.plot(t, baseline_num_sqrt, '--', color='deepskyblue', label='Baseline')
+
+        ax2.set_title('Square Root Ct-DNA Diffusion with Mean and Variance Cone')
+        ax2.set_xlabel('Time')
+        ax2.set_ylabel('Ct-DNA Proportion')
+        ax2.legend()
+        ax2.grid(alpha=0.3)
+        fig2.text(0.5, 0.01, param_text_geo,
+          ha="center", va="bottom", fontsize=9)
+        plt.tight_layout(rect=[0, 0.08, 1, 1])
+        plt.show()
+
+
+        
        
         
         
+        
+
 
 
 
