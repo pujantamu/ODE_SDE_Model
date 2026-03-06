@@ -438,7 +438,7 @@ class LotkaVolterraModel:
         integrand = f_values * np.exp(- self.nu * (t - s_values))
         
         # Use the trapezoidal rule for numerical integration
-        integral = np.trapz(integrand, s_values)
+        integral = np.trapezoid(integrand, s_values)
         
         # Return the value of m(t)
         return (start_c0 * np.exp(-self.nu * t)) + integral
@@ -461,7 +461,7 @@ class LotkaVolterraModel:
         
         integrand = 2 * np.exp((self.sigma**2 - 2 * self.nu) * (t - s_values)) * m_values * f_values
         
-        integral = np.trapz(integrand, s_values)    
+        integral = np.trapezoid(integrand, s_values)    
         
         variance = term1 - term3 + integral
         return variance
@@ -483,7 +483,7 @@ class LotkaVolterraModel:
         term1 = (start_c0 ** 2) * np.exp(-2.0 * self.nu * t)
 
         integrand = (2.0 * fhat_values + self.starsigma **2) * np.exp(-2.0 * self.nu * (t - s_values)) * m_values
-        integral = np.trapz(integrand, s_values)
+        integral = np.trapezoid(integrand, s_values)
 
         variance = term1 + integral - (m_t ** 2)
         return variance
@@ -499,7 +499,7 @@ class LotkaVolterraModel:
 
 
         integrand = (self.starsigma**2) * np.exp(-2.0 * self.nu * (t - s_values)) * m_values
-        V = np.trapz(integrand, s_values)  # since V(0)=0
+        V = np.trapezoid(integrand, s_values)  # since V(0)=0
         return V
     
     def Mean_return_compartment(self, eqstate):
@@ -519,7 +519,7 @@ class LotkaVolterraModel:
         q = lambda x : (-2) / (pow(self.sigma * x,2))
         
         def inner_integral(v, y):
-            return np.exp(-np.trapz([p(z) for z in np.linspace(v, y, 100)], np.linspace(v, y, 100)))
+            return np.exp(-np.trapezoid([p(z) for z in np.linspace(v, y, 100)], np.linspace(v, y, 100)))
 
         def integrand(v, y, x0):
             return inner_integral(v, y) * q(v)
@@ -883,12 +883,12 @@ class LotkaVolterraModel:
         plt.tight_layout(rect=[0, 0.08, 1, 1])
         plt.show()
 
-
         
        
         
         
         
+
 
 
 
