@@ -569,70 +569,75 @@ class LotkaVolterraModel:
         fig = plt.figure(figsize=(20, 24))
         gs = gridspec.GridSpec(4, 2, height_ratios=[1, 1, 1, 1], width_ratios=[1, 1])
 
+        # Panel a.
         ax1 = plt.subplot(gs[0, :])
+        ax1.text(-0.05, 1.05, 'a.', transform=ax1.transAxes, fontsize=24, fontweight='bold', va='bottom')
         ax1.plot(t, self.T1, label='Evasive Tumor ($E$)')
         ax1.plot(t, self.T2, label='Baseline Tumor ($B$)')
         ax1.plot(t, self.I, label='Immune ($I$)')
-        ax1.set_xlabel('Time',fontsize=text_fontsize)
-        ax1.set_ylabel('Population',fontsize=text_fontsize)
+        ax1.set_xlabel('Time', fontsize=text_fontsize)
+        ax1.set_ylabel('Population', fontsize=text_fontsize)
         ax1.set_title('Lotka-Volterra Model with One Immune and Two Tumor Sub-Clones')
         ax1.legend()
 
+        # Panel b.
         ax2 = plt.subplot(gs[1, 0])
+        ax2.text(-0.1, 1.05, 'b.', transform=ax2.transAxes, fontsize=24, fontweight='bold', va='bottom')
         ax2.plot(t, evasive_num + baseline_num, label='SDE Numerical', linestyle='--', color='pink')
         ax2.plot(t, evasive_path + baseline_path, label='Path Solution',  color='red')
         ax2.plot(t, evasive_num_sqrt + baseline_num_sqrt, label='SDE Numerical (sqrt)', linestyle='--', color='purple')
-        ax2.set_xlabel('Time',fontsize=text_fontsize)
-        ax2.set_ylabel('Biomarker abundance',fontsize=text_fontsize)
+        ax2.set_xlabel('Time', fontsize=text_fontsize)
+        ax2.set_ylabel('Biomarker abundance', fontsize=text_fontsize)
         ax2.set_title('Cumulative Biomarker Diffusion (Path and Numerical)')       
         ax2.legend()
 
+        # Panel c.
         ax3 = plt.subplot(gs[1, 1])
+        ax3.text(-0.1, 1.05, 'c.', transform=ax3.transAxes, fontsize=24, fontweight='bold', va='bottom')
         ax3.plot(t, necrosis_path, label='Necrotic Biomarker abundance (Path)', color='red')
         ax3.plot(t, apoptosis_path, label='Apoptotic Biomarker abundance (Path)', color='blue')
         ax3.plot(t, necrosis_num, label='Necrotic Biomarker abundance (Numerical)', linestyle='--', color='pink')
         ax3.plot(t, apoptosis_num, label='Apoptotic Biomarker abundance (Numerical)', linestyle='--', color='skyblue')
-        ax3.plot(t, necrosis_num_sqrt,
-         label='Necrotic Biomarker (Num, sqrt)', linestyle='--', color='purple')
-        ax3.plot(t, apoptosis_num_sqrt,
-                label='Apoptotic Biomarker (Num, sqrt)', linestyle='--', color='orchid')
-
-        ax3.set_xlabel('Time',fontsize=text_fontsize)
-        ax3.set_ylabel('Biomarker abundance',fontsize=text_fontsize)
+        ax3.plot(t, necrosis_num_sqrt, label='Necrotic Biomarker (Num, sqrt)', linestyle='--', color='purple')
+        ax3.plot(t, apoptosis_num_sqrt, label='Apoptotic Biomarker (Num, sqrt)', linestyle='--', color='orchid')
+        ax3.set_xlabel('Time', fontsize=text_fontsize)
+        ax3.set_ylabel('Biomarker abundance', fontsize=text_fontsize)
         ax3.set_title('Biomarker Diffusion (Path and Numerical Solution)')
         ax3.legend()
                                
+        # Panel d.
         ax4 = plt.subplot(gs[2, 0])
+        ax4.text(-0.1, 1.05, 'd.', transform=ax4.transAxes, fontsize=24, fontweight='bold', va='bottom')
         ax4.plot(t, evasive_path, label='Evasive Clone (Path)', color='red')
         ax4.plot(t, baseline_path, label='Baseline Clone (Path)', color='blue')
         ax4.plot(t, evasive_num, label='Evasive Clone (Num)', linestyle='--', color='pink')
         ax4.plot(t, baseline_num, label='Baseline Clone (Num)', linestyle='--', color='skyblue')
-        ax4.plot(t, evasive_num_sqrt,
-         label='Evasive Clone (Num, sqrt)', linestyle='--', color='purple')
-        ax4.plot(t, baseline_num_sqrt,  
-         label='Baseline Clone (Num, sqrt)', linestyle='--', color='orchid')
-        ax4.set_xlabel('Time',fontsize=text_fontsize)
-        ax4.set_ylabel('Biomarker Proportion wrt $C^*$',fontsize=text_fontsize)
+        ax4.plot(t, evasive_num_sqrt, label='Evasive Clone (Num, sqrt)', linestyle='--', color='purple')
+        ax4.plot(t, baseline_num_sqrt, label='Baseline Clone (Num, sqrt)', linestyle='--', color='orchid')
+        ax4.set_xlabel('Time', fontsize=text_fontsize)
+        ax4.set_ylabel('Biomarker Proportion wrt $C^*$', fontsize=text_fontsize)
         ax4.set_title('Biomarker Diffusion via Clonal Source(Path and Numerical)')
         ax4.legend()
 
+        # Panel e.
         ax5 = plt.subplot(gs[2, 1])
+        ax5.text(-0.1, 1.05, 'e.', transform=ax5.transAxes, fontsize=24, fontweight='bold', va='bottom')
         ax5.plot(t, necrosis_evasive_num, label='N Evasive (Num)', linestyle='--', color='pink')
         ax5.plot(t, apoptosis_evasive_num, label='A Evasive (Num)',linestyle='--', color='skyblue')
         ax5.plot(t, necrosis_baseline_num, label='N Baseline (Num)', linestyle='--', color='bisque')
         ax5.plot(t, apoptosis_baseline_num, label='A Baseline (Num)', linestyle='--', color='silver')
-        
         ax5.plot(t, necrosis_evasive_path, label='N Evasive (Path)', color='red')
         ax5.plot(t, apoptosis_evasive_path, label='A Evasive (Path)', color='blue')
         ax5.plot(t, necrosis_baseline_path, label='N Baseline (Path)',  color= 'darkorange')
         ax5.plot(t, apoptosis_baseline_path, label='A Baseline (Path)', color='black')
-        
-        ax5.set_xlabel('Time',fontsize=text_fontsize)
-        ax5.set_ylabel('Biomarker Proportion wrt $C^*$',fontsize=text_fontsize)
+        ax5.set_xlabel('Time', fontsize=text_fontsize)
+        ax5.set_ylabel('Biomarker Proportion wrt $C^*$', fontsize=text_fontsize)
         ax5.set_title('Biomarker Diffusion via Mechanism Source ')
         ax5.legend()
         
+        # Panel f.
         ax6 = plt.subplot(gs[3, 0])
+        ax6.text(-0.1, 1.05, 'f.', transform=ax6.transAxes, fontsize=24, fontweight='bold', va='bottom')
         std_dev_evasive = np.sqrt(np.maximum(var_path_evasive, 0))
         upper_bound_evasive = mean_path_evasive + std_dev_evasive
         lower_bound_evasive = mean_path_evasive - std_dev_evasive
@@ -644,14 +649,8 @@ class LotkaVolterraModel:
         ax6.plot(t, mean_path_evasive, label='Evasive Mean', color='darkred')
         ax6.plot(t, mean_path_baseline, label='Baseline Mean', color='darkblue')
 
-        ax6.fill_between(
-            t, lower_bound_evasive, upper_bound_evasive,
-            color='lightcoral', alpha=0.2, label='Evasive ± 1 Std-dev'
-        )
-        ax6.fill_between(
-            t, lower_bound_baseline, upper_bound_baseline,
-            color='lightskyblue', alpha=0.2, label='Baseline ± 1 Std-dev'
-        )
+        ax6.fill_between(t, lower_bound_evasive, upper_bound_evasive, color='lightcoral', alpha=0.2, label='Evasive ± 1 Std-dev')
+        ax6.fill_between(t, lower_bound_baseline, upper_bound_baseline, color='lightskyblue', alpha=0.2, label='Baseline ± 1 Std-dev')
 
         ax6.plot(t, evasive_num, '--', color='pink', label='Evasive (Num)')
         ax6.plot(t, evasive_path, color='red', label='Evasive (Path)')
@@ -659,13 +658,14 @@ class LotkaVolterraModel:
         ax6.plot(t, baseline_path, color='dodgerblue', label='Baseline (Path)')
 
         ax6.set_title('Geometric Biomarker Diffusion with Mean and Variance Cone')
-        ax6.set_xlabel('Time',fontsize=text_fontsize)
-        ax6.set_ylabel('Biomarker Proportion',fontsize=text_fontsize)
+        ax6.set_xlabel('Time', fontsize=text_fontsize)
+        ax6.set_ylabel('Biomarker Proportion', fontsize=text_fontsize)
         ax6.legend()
         ax6.grid(alpha=0.3)
         
-        
+        # Panel g.
         ax7 = plt.subplot(gs[3, 1])
+        ax7.text(-0.1, 1.05, 'g.', transform=ax7.transAxes, fontsize=24, fontweight='bold', va='bottom')
         std_dev_evasive_sqrt = np.sqrt(np.maximum(var_path_evasive_sqrt, 0))
         upper_bound_evasive_sqrt = mean_path_evasive_sqrt + std_dev_evasive_sqrt
         lower_bound_evasive_sqrt = mean_path_evasive_sqrt - std_dev_evasive_sqrt
@@ -674,14 +674,8 @@ class LotkaVolterraModel:
         upper_bound_baseline_sqrt = mean_path_baseline_sqrt + std_dev_baseline_sqrt
         lower_bound_baseline_sqrt = mean_path_baseline_sqrt - std_dev_baseline_sqrt
 
-        ax7.fill_between(
-            t, lower_bound_evasive_sqrt, upper_bound_evasive_sqrt,
-            color='lightcoral', alpha=0.2, label='Evasive ± 1 Std-dev'
-        )
-        ax7.fill_between(
-            t, lower_bound_baseline_sqrt, upper_bound_baseline_sqrt,
-            color='lightskyblue', alpha=0.2, label='Baseline ± 1 Std-dev'
-        )
+        ax7.fill_between(t, lower_bound_evasive_sqrt, upper_bound_evasive_sqrt, color='lightcoral', alpha=0.2, label='Evasive ± 1 Std-dev')
+        ax7.fill_between(t, lower_bound_baseline_sqrt, upper_bound_baseline_sqrt, color='lightskyblue', alpha=0.2, label='Baseline ± 1 Std-dev')
 
         ax7.plot(t, mean_path_evasive_sqrt, label='Evasive Mean', color='darkred')
         ax7.plot(t, mean_path_baseline_sqrt, label='Baseline Mean', color='darkblue')
@@ -689,11 +683,10 @@ class LotkaVolterraModel:
         ax7.plot(t, baseline_num_sqrt, '--', color='deepskyblue', label='Baseline')
 
         ax7.set_title('Square Root Biomarker Diffusion with Mean and Variance Cone')
-        ax7.set_xlabel('Time',fontsize=text_fontsize)
-        ax7.set_ylabel('Biomarker Proportion',fontsize=text_fontsize)
+        ax7.set_xlabel('Time', fontsize=text_fontsize)
+        ax7.set_ylabel('Biomarker Proportion', fontsize=text_fontsize)
         ax7.legend()
         ax7.grid(alpha=0.3)
-        
         
         fig.suptitle(f'r = {self.r}, gamma = {self.gamma}, alpha = {self.alpha}, beta = {self.beta}, a = {self.a}, b = {self.b}, delta = {self.delta}, p = {self.p} , q = {self.q}, K = {self.K}, nu = {self.nu}, sigma= {self.sigma}, ($E_0$, $B_0$, $I_0$)= ({self.initial_conditions[0]}, {self.initial_conditions[1]}, {self.initial_conditions[2]}), $C_0$ = {self.apoptotic_start}, T = {self.T}, $C^*$ = {self.cstar}')
         plt.tight_layout(rect=[0, 0, 1, 0.97])
@@ -888,6 +881,7 @@ class LotkaVolterraModel:
         
         
         
+
 
 
 
